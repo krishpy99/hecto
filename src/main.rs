@@ -1,8 +1,8 @@
 #![warn(clippy::all, clippy::pedantic)]
 mod editor;
 mod terminal;
-pub use terminal::Terminal;
 pub use editor::Position;
+pub use terminal::Terminal;
 
 use editor::Editor;
 

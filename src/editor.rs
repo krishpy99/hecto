@@ -14,6 +14,17 @@ pub struct Editor {
     cursor_position: Position,
 }
 
+impl Default for Editor {
+    fn default() -> Self {
+        Self {
+            should_quit: false,
+            terminal: Terminal::new().expect("Failed to initialize terminal"),
+            // top-left corner
+            cursor_position: Position { x: 0, y: 0 },
+        }
+    }
+}
+
 impl Editor {
     pub fn run(&mut self) {
         loop {
@@ -27,15 +38,6 @@ impl Editor {
             if let Err(e) = &self.process_keypress() {
                 die(e);
             }
-        }
-    }
-
-    pub fn default() -> Self {
-        Self {
-            should_quit: false,
-            terminal: Terminal::default().expect("Failed to initialize terminal"),
-            // top-left corner
-            cursor_position: Position { x: 0, y: 0 },
         }
     }
 
