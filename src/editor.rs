@@ -1,4 +1,4 @@
-use crate::terminal::Terminal;
+use crate::Terminal;
 use termion::event::Key;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
