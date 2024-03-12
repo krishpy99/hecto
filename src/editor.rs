@@ -19,11 +19,11 @@ impl Editor {
                         if c.is_control() {
                             println!("{:?}\r", c as u8);
                         } else {
-                            println!("{:?} ({})\r", c as u8, c);
+                            println!("{:?} ({c})\r", c as u8);
                         }
                     }
                     Key::Ctrl('q') => break,
-                    _ => println!("{:?}\r", key),
+                    _ => println!("{key:?}\r"),
                 },
                 Err(e) => die(e),
             }
