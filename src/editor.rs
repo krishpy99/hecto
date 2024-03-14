@@ -1,14 +1,34 @@
+use std::time::Duration;
+use std::time::Instant;
+
 use crate::Document;
 use crate::Row;
 use crate::Terminal;
+use termion::color;
 use termion::event::Key;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
+const STATUS_BG_COLOR: color::Rgb = color::Rgb(239, 239, 239);
+const STATUS_FG_COLOR: color::Rgb = color::Rgb(63, 63, 63);
 
 #[derive(Default)]
 pub struct Position {
     pub x: usize,
     pub y: usize,
+}
+
+struct StatusMessage {
+    text: String,
+    time: Instant,
+}
+
+impl StatusMessage {
+    fn from(text: String) -> Self {
+        Self {
+            text,
+            time: Instant::now(),
+        }
+    }
 }
 
 pub struct Editor {
@@ -18,14 +38,21 @@ pub struct Editor {
     /// Where of the file the user is currently scrolled to.
     offset: Position,
     cursor_position: Position,
+    status_message: StatusMessage,
 }
 
 impl Default for Editor {
     fn default() -> Self {
         let args: Vec<String> = std::env::args().collect();
+        let mut initial_status = String::from("HELP: Ctrl-Q = quit");
         let document = if args.len() > 1 {
             let filename = &args[1];
-            Document::open(filename).unwrap_or_default()
+            if let Ok(doc) = Document::open(filename) {
+                doc
+            } else {
+                initial_status = format!("ERR: Could not open file: {filename}");
+                Document::default()
+            }
         } else {
             Document::default()
         };
@@ -36,6 +63,7 @@ impl Default for Editor {
             offset: Position::default(),
             // top-left corner
             cursor_position: Position::default(),
+            status_message: StatusMessage::from(initial_status),
         }
     }
 }
@@ -64,6 +92,8 @@ impl Editor {
             Editor::farewell();
         } else {
             self.draw_rows();
+            self.draw_status_bar();
+            self.draw_message_bar();
             let cursor_pos_relative_to_offset = Position {
                 x: self.cursor_position.x.saturating_sub(self.offset.x),
                 y: self.cursor_position.y.saturating_sub(self.offset.y),
@@ -84,7 +114,7 @@ impl Editor {
     fn draw_rows(&self) {
         let height = self.terminal.size().height;
         // The last line is kept empty for the status bar.
-        for term_row in 0..height - 1 {
+        for term_row in 0..height {
             Terminal::clear_current_line();
             // If such row exists, draw it.
             if let Some(row) = self.document.row(term_row as usize + self.offset.y) {
@@ -231,6 +261,46 @@ impl Editor {
         }
 
         self.cursor_position = Position { x, y };
+    }
+
+    fn draw_status_bar(&self) {
+        let filename = if let Some(name) = &self.document.filename {
+            let mut name = name.clone();
+            name.truncate(20);
+            name
+        } else {
+            "[No Name]".to_string()
+        };
+        let mut status = format!("{filename} - {} lines", self.document.len());
+        let line_indicator = format!(
+            "{}/{}",
+            self.cursor_position.y.saturating_add(1), /* 1-based */
+            self.document.len()
+        );
+        let len = status.len() + line_indicator.len();
+        let term_width = self.terminal.size().width as usize;
+        if term_width > len {
+            status.push_str(&" ".repeat(term_width - len));
+        }
+        // XXX: Isn't status always less than or equal to term_width?
+        status.truncate(term_width);
+        // The current line number is aligned to the right edge.
+        status = format!("{status}{line_indicator}");
+        Terminal::set_bg_color(STATUS_BG_COLOR);
+        Terminal::set_fg_color(STATUS_FG_COLOR);
+        println!("{status}\r");
+        Terminal::reset_bg_color();
+        Terminal::reset_fg_color();
+    }
+
+    fn draw_message_bar(&self) {
+        Terminal::clear_current_line();
+        let message = &self.status_message;
+        if message.time.elapsed() < Duration::from_secs(5) {
+            let mut text = message.text.clone();
+            text.truncate(self.terminal.size().width as usize);
+            print!("{text}");
+        }
     }
 }
 
