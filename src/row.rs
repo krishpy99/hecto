@@ -32,8 +32,10 @@ impl Row {
             .skip(start /* the ones to the left of the screen */)
             .take(end - start /* the visible portion of the row */)
         {
-            // A tab is converted to 2 spaces.
-            result.push_str(if grapheme == "\t" { "  " } else { grapheme });
+            // A tab is converted to a single space.
+            // NOTE: If converting to multiple spaces, special care would be needed to
+            // maintain the cursor position, as well as leaving it as it is.
+            result.push_str(if grapheme == "\t" { " " } else { grapheme });
         }
         result
     }
