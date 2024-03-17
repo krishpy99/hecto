@@ -1,11 +1,14 @@
 use crate::Position;
 use crate::Row;
-use std::cmp::Ordering;
+use std::fs;
+use std::io::{Error, Write};
 
 #[derive(Default)]
 pub struct Document {
     rows: Vec<Row>,
     pub filename: Option<String>,
+    /// Whether the document has been modified since the last save.
+    is_dirty: bool,
 }
 
 impl Document {
@@ -20,6 +23,7 @@ impl Document {
         Ok(Self {
             rows,
             filename: Some(filename.to_string()),
+            is_dirty: false,
         })
     }
 
@@ -42,6 +46,10 @@ impl Document {
     /// # Panics
     /// Panics if trying to insert pass the end of the row.
     pub fn insert(&mut self, at: &Position, c: char) {
+        if at.y > self.len() {
+            return;
+        }
+        self.is_dirty = true;
         if c == '\n' {
             self.insert_newline(at);
             return;
@@ -49,26 +57,19 @@ impl Document {
         // If adding to the end of the file, push a new row with such
         // character as the first character; otherwise, take that row
         // and insert to the corresponding position.
-        match at.y.cmp(&self.len()) {
-            Ordering::Equal => {
-                let mut row = Row::default();
-                row.insert(0, c);
-                self.rows.push(row);
-            }
-            Ordering::Less => {
-                let row = self.rows.get_mut(at.y).unwrap();
-                row.insert(at.x, c);
-            }
-            Ordering::Greater => {
-                unreachable!()
-            }
+        if at.y == self.len() {
+            let mut row = Row::default();
+            row.insert(0, c);
+            self.rows.push(row);
+        } else {
+            let row = self.rows.get_mut(at.y).unwrap();
+            row.insert(at.x, c);
         }
     }
 
+    /// # Notes
+    /// The dirty flag is not touched.
     fn insert_newline(&mut self, at: &Position) {
-        if at.y > self.len() {
-            return;
-        }
         // NOTE: Navigating to one row below the last is allowed.
         if at.y == self.len() {
             self.rows.push(Row::default());
@@ -82,10 +83,10 @@ impl Document {
     /// # Panics
     /// Panics if trying to delete pass the end of the row.
     pub fn delete(&mut self, at: &Position) {
-        let len = self.len();
-        if at.y >= len {
+        if at.y >= self.len() {
             return;
         }
+        self.is_dirty = true;
         // If deleting at the end of the row, the next row is moved up.
         if at.x == self.rows.get(at.y).unwrap().len() && self.is_not_last_row(at) {
             let next_row = self.rows.remove(at.y + 1);
@@ -99,5 +100,25 @@ impl Document {
 
     fn is_not_last_row(&self, at: &Position) -> bool {
         at.y < self.len() - 1
+    }
+
+    /// # Errors
+    /// Returns an error if the file doesn't exist and can't be created, or can't
+    /// be written.
+    pub fn save(&mut self) -> Result<(), Error> {
+        if let Some(filename) = &self.filename {
+            let mut file = fs::File::create(filename)?;
+            for row in &self.rows {
+                file.write_all(row.as_bytes())?;
+                file.write_all(b"\n")?;
+            }
+            self.is_dirty = false;
+        }
+        Ok(())
+    }
+
+    #[must_use]
+    pub fn is_dirty(&self) -> bool {
+        self.is_dirty
     }
 }

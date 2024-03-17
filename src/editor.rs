@@ -10,6 +10,8 @@ use termion::event::Key;
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const STATUS_BG_COLOR: color::Rgb = color::Rgb(239, 239, 239);
 const STATUS_FG_COLOR: color::Rgb = color::Rgb(63, 63, 63);
+/// The number of times the user has to press `Ctrl-Q` to quit.
+const QUIT_TIMES: u8 = 3;
 
 #[derive(Default)]
 pub struct Position {
@@ -29,6 +31,12 @@ impl StatusMessage {
             time: Instant::now(),
         }
     }
+
+    /// A shorthand for `StatusMessage::from(String::new())`.
+    fn clear(&mut self) {
+        self.text.clear();
+        self.time = Instant::now();
+    }
 }
 
 pub struct Editor {
@@ -39,12 +47,13 @@ pub struct Editor {
     offset: Position,
     cursor_position: Position,
     status_message: StatusMessage,
+    quit_times: u8,
 }
 
 impl Default for Editor {
     fn default() -> Self {
         let args: Vec<String> = std::env::args().collect();
-        let mut initial_status = String::from("HELP: Ctrl-Q = quit");
+        let mut initial_status = String::from("HELP: Ctrl-S = save | Ctrl-Q = quit");
         let document = if args.len() > 1 {
             let filename = &args[1];
             if let Ok(doc) = Document::open(filename) {
@@ -64,6 +73,7 @@ impl Default for Editor {
             // top-left corner
             cursor_position: Position::default(),
             status_message: StatusMessage::from(initial_status),
+            quit_times: QUIT_TIMES,
         }
     }
 }
@@ -152,8 +162,20 @@ impl Editor {
     fn process_keypress(&mut self) -> Result<(), std::io::Error> {
         let pressed_key = Terminal::read_key()?;
         match pressed_key {
-            // Getting a `quit` signal isn't an error.
-            Key::Ctrl('q') => self.should_quit = true,
+            // NOTE: Getting a `quit` signal isn't an error.
+            Key::Ctrl('q') => {
+                if self.quit_times > 0 && self.document.is_dirty() {
+                    self.status_message = StatusMessage::from(format!(
+                        "WARN: File has unsaved changes! Press Ctrl-Q {} more times to quit.",
+                        self.quit_times
+                    ));
+                    self.quit_times -= 1;
+                    return Ok(());
+                } else {
+                    self.should_quit = true;
+                }
+            }
+            Key::Ctrl('s') => self.save(),
             Key::Char(c) => {
                 self.document.insert(&self.cursor_position, c);
                 // So that we don't insert backward.
@@ -178,6 +200,11 @@ impl Editor {
             _ => (),
         }
         self.scroll();
+        // The user aborted the quit sequence.
+        if self.quit_times < QUIT_TIMES {
+            self.quit_times = QUIT_TIMES;
+            self.status_message.clear();
+        }
         Ok(())
     }
 
@@ -277,6 +304,11 @@ impl Editor {
     }
 
     fn draw_status_bar(&self) {
+        let modified_indicator = if self.document.is_dirty() {
+            " (modified)"
+        } else {
+            ""
+        };
         let filename = if let Some(name) = &self.document.filename {
             let mut name = name.clone();
             name.truncate(20);
@@ -284,7 +316,10 @@ impl Editor {
         } else {
             "[No Name]".to_string()
         };
-        let mut status = format!("{filename} - {} lines", self.document.len());
+        let mut status = format!(
+            "{filename} - {} lines{modified_indicator}",
+            self.document.len()
+        );
         let line_indicator = format!(
             "{}/{}",
             self.cursor_position.y.saturating_add(1), /* 1-based */
@@ -314,6 +349,60 @@ impl Editor {
             text.truncate(self.terminal.size().width as usize);
             print!("{text}");
         }
+    }
+
+    /// Prompt the user for input. `None` is returned if the user cancels the prompt.
+    /// # Errors
+    /// Returns an error if the user input can't be read.
+    fn prompt(&mut self, prompt: &str) -> Result<Option<String>, std::io::Error> {
+        let mut result = String::new();
+        loop {
+            self.status_message = StatusMessage::from(format!("{prompt}{result}"));
+            self.refresh_screen()?;
+            match Terminal::read_key()? {
+                Key::Backspace => {
+                    if !result.is_empty() {
+                        result.pop();
+                    }
+                }
+                // Enter is pressed; prompt is done.
+                Key::Char('\n') => break,
+                Key::Char(c) => {
+                    if !c.is_control() {
+                        result.push(c);
+                    }
+                }
+                Key::Esc => {
+                    result.clear();
+                    break;
+                }
+                _ => (),
+            }
+        }
+        self.status_message.clear();
+        if result.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(result))
+        }
+    }
+
+    fn save(&mut self) {
+        // If the file has no name, prompt the user for one.
+        if self.document.filename.is_none() {
+            let new_name = self.prompt("Save as: ").unwrap_or(None);
+            if new_name.is_none() {
+                self.status_message = StatusMessage::from("Save aborted.".to_string());
+                return;
+            }
+            self.document.filename = new_name;
+        }
+        let msg = if self.document.save().is_ok() {
+            "File saved sucessfully."
+        } else {
+            "Error writing file!"
+        };
+        self.status_message = StatusMessage::from(msg.to_string());
     }
 }
 
