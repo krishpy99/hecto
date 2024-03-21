@@ -1,4 +1,4 @@
-use std::cmp;
+use core::cmp;
 
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -27,7 +27,10 @@ impl Row {
         // In case that `start` is greater than `end`, we want to return an empty string.
         let start = cmp::min(start, end);
         let mut result = String::new();
-        for grapheme in self.string[..]
+        #[allow(clippy::arithmetic_side_effects)]
+        for grapheme in self
+            .string
+            .as_str()
             .graphemes(true)
             .skip(start /* the ones to the left of the screen */)
             .take(end - start /* the visible portion of the row */)
@@ -52,7 +55,7 @@ impl Row {
 
     /// To avoid recomputing the length of the row every time we need it.
     fn update_len(&mut self) {
-        self.len = self.string[..].graphemes(true).count();
+        self.len = self.string.as_str().graphemes(true).count();
     }
 
     pub fn insert(&mut self, at: usize, c: char) {
@@ -61,8 +64,8 @@ impl Row {
         } else {
             // Splits the string into two half, inserts the character after the
             // first part, and then append the second part.
-            let mut result: String = self.string[..].graphemes(true).take(at).collect();
-            let reminder: String = self.string[..].graphemes(true).skip(at).collect();
+            let mut result: String = self.string.as_str().graphemes(true).take(at).collect();
+            let reminder: String = self.string.as_str().graphemes(true).skip(at).collect();
             result.push(c);
             result.push_str(&reminder);
             self.string = result;
@@ -70,12 +73,13 @@ impl Row {
         self.update_len();
     }
 
+    #[allow(clippy::arithmetic_side_effects)]
     pub fn delete(&mut self, at: usize) {
         if at >= self.len() {
             return;
         }
-        let mut result: String = self.string[..].graphemes(true).take(at).collect();
-        let remainder: String = self.string[..].graphemes(true).skip(at + 1).collect();
+        let mut result: String = self.string.as_str().graphemes(true).take(at).collect();
+        let remainder: String = self.string.as_str().graphemes(true).skip(at + 1).collect();
         result.push_str(&remainder);
         self.string = result;
         self.update_len();
@@ -90,11 +94,11 @@ impl Row {
     /// everything behind that index.
     #[must_use]
     pub fn split(&mut self, at: usize) -> Self {
-        let beginning: String = self.string[..].graphemes(true).take(at).collect();
-        let remainder: String = self.string[..].graphemes(true).skip(at).collect();
+        let beginning: String = self.string.as_str().graphemes(true).take(at).collect();
+        let remainder: String = self.string.as_str().graphemes(true).skip(at).collect();
         self.string = beginning;
         self.update_len();
-        Self::from(&remainder[..])
+        Self::from(&*remainder)
     }
 
     #[must_use]

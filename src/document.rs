@@ -14,15 +14,15 @@ pub struct Document {
 impl Document {
     /// # Errors
     /// Returns an error if the file can't be read.
-    pub fn open(filename: &str) -> Result<Self, std::io::Error> {
-        let content = std::fs::read_to_string(filename)?;
+    pub fn open(filename: &str) -> Result<Self, Error> {
+        let content = fs::read_to_string(filename)?;
         let mut rows = Vec::new();
         for value in content.lines() {
             rows.push(Row::from(value));
         }
         Ok(Self {
             rows,
-            filename: Some(filename.to_string()),
+            filename: Some(filename.to_owned()),
             is_dirty: false,
         })
     }
@@ -62,7 +62,8 @@ impl Document {
             row.insert(0, c);
             self.rows.push(row);
         } else {
-            let row = self.rows.get_mut(at.y).unwrap();
+            #[allow(clippy::indexing_slicing)]
+            let row = &mut self.rows[at.y];
             row.insert(at.x, c);
         }
     }
@@ -70,36 +71,42 @@ impl Document {
     /// # Notes
     /// The dirty flag is not touched.
     fn insert_newline(&mut self, at: &Position) {
+        if at.y > self.len() {
+            return;
+        }
         // NOTE: Navigating to one row below the last is allowed.
         if at.y == self.len() {
             self.rows.push(Row::default());
             return;
         }
         // This works even at the end of a line, with `new_row` being empty.
-        let new_row = self.rows.get_mut(at.y).unwrap().split(at.x);
+        #[allow(clippy::indexing_slicing)]
+        let new_row = self.rows[at.y].split(at.x);
+        #[allow(clippy::arithmetic_side_effects)]
         self.rows.insert(at.y + 1, new_row);
     }
 
     /// # Panics
     /// Panics if trying to delete pass the end of the row.
+    #[allow(clippy::indexing_slicing, clippy::arithmetic_side_effects)]
     pub fn delete(&mut self, at: &Position) {
         if at.y >= self.len() {
             return;
         }
         self.is_dirty = true;
         // If deleting at the end of the row, the next row is moved up.
-        if at.x == self.rows.get(at.y).unwrap().len() && self.is_not_last_row(at) {
+        if at.x == self.rows[at.y].len()
+        // not last row
+        && at.y + 1 < self.len()
+        {
+            #[allow(clippy::arithmetic_side_effects)]
             let next_row = self.rows.remove(at.y + 1);
-            let this_row = self.rows.get_mut(at.y).unwrap();
+            let this_row = &mut self.rows[at.y];
             this_row.append(&next_row);
         } else {
-            let this_row = self.rows.get_mut(at.y).unwrap();
+            let this_row = &mut self.rows[at.y];
             this_row.delete(at.x);
         }
-    }
-
-    fn is_not_last_row(&self, at: &Position) -> bool {
-        at.y < self.len() - 1
     }
 
     /// # Errors
