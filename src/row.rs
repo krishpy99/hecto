@@ -105,4 +105,48 @@ impl Row {
     pub fn as_bytes(&self) -> &[u8] {
         self.string.as_bytes()
     }
+
+    /// Finds the index of the first occurrence of a query string after a given index.
+    #[must_use]
+    pub fn find_after(&self, query: &str, after: usize) -> Option<usize> {
+        if after >= self.len() {
+            return None;
+        }
+        let substring: String = self.string.as_str().graphemes(true).skip(after).collect();
+        let match_byte_index = substring.find(query);
+        if let Some(match_byte_index) = match_byte_index {
+            for (grapheme_index, (byte_index, _)) in
+                substring.as_str().grapheme_indices(true).enumerate()
+            {
+                if byte_index == match_byte_index {
+                    #[allow(clippy::arithmetic_side_effects)]
+                    return Some(after + grapheme_index);
+                }
+            }
+        }
+        None
+    }
+
+    /// Finds the index of the last occurrence of a query string before a given index. `before` is
+    /// excluded from the search.
+    #[must_use]
+    pub fn rfind_before(&self, query: &str, before: usize) -> Option<usize> {
+        if before == 0 {
+            return None;
+        }
+        // NOTE: Since a before exceeding the length of the row doesn't affect the result,
+        // we permit it.
+        let substring: String = self.string.as_str().graphemes(true).take(before).collect();
+        let match_byte_index = substring.rfind(query);
+        if let Some(match_byte_index) = match_byte_index {
+            for (grapheme_index, (byte_index, _)) in
+                substring.as_str().grapheme_indices(true).enumerate()
+            {
+                if byte_index == match_byte_index {
+                    return Some(grapheme_index);
+                }
+            }
+        }
+        None
+    }
 }

@@ -14,7 +14,7 @@ const STATUS_FG_COLOR: color::Rgb = color::Rgb(63, 63, 63);
 /// The number of times the user has to press `Ctrl-Q` to quit.
 const QUIT_TIMES: u8 = 3;
 
-#[derive(Default)]
+#[derive(Default, Clone, PartialEq)]
 pub struct Position {
     pub x: usize,
     pub y: usize,
@@ -54,7 +54,8 @@ pub struct Editor {
 impl Default for Editor {
     fn default() -> Self {
         let args: Vec<String> = env::args().collect();
-        let mut initial_status = String::from("HELP: Ctrl-S = save | Ctrl-Q = quit");
+        let mut initial_status =
+            String::from("HELP: Ctrl-F = find | Ctrl-S = save | Ctrl-Q = quit");
         let document = if let Some(filename) = args.get(1) {
             if let Ok(doc) = Document::open(filename) {
                 doc
@@ -178,6 +179,7 @@ impl Editor {
                 self.should_quit = true;
             }
             Key::Ctrl('s') => self.save(),
+            Key::Ctrl('f') => self.search(),
             Key::Char(c) => {
                 self.document.insert(&self.cursor_position, c);
                 // So that we don't insert backward.
@@ -355,14 +357,20 @@ impl Editor {
     }
 
     /// Prompt the user for input. `None` is returned if the user cancels the prompt.
+    /// The callback is called whenever a key is pressed, along with the key and the current input.
     /// # Errors
     /// Returns an error if the user input can't be read.
-    fn prompt(&mut self, prompt: &str) -> Result<Option<String>, Error> {
+    /// XXX: Optional callback?
+    fn prompt<C>(&mut self, prompt: &str, mut callback: C) -> Result<Option<String>, Error>
+    where
+        C: FnMut(&mut Self, Key, &String),
+    {
         let mut result = String::new();
         loop {
             self.status_message = StatusMessage::from(format!("{prompt}{result}"));
             self.refresh_screen()?;
-            match Terminal::read_key()? {
+            let key = Terminal::read_key()?;
+            match key {
                 Key::Backspace => {
                     if !result.is_empty() {
                         result.pop();
@@ -381,6 +389,7 @@ impl Editor {
                 }
                 _ => (),
             }
+            callback(self, key, &result);
         }
         self.status_message.clear();
         if result.is_empty() {
@@ -393,7 +402,7 @@ impl Editor {
     fn save(&mut self) {
         // If the file has no name, prompt the user for one.
         if self.document.filename.is_none() {
-            let new_name = self.prompt("Save as: ").unwrap_or(None);
+            let new_name = self.prompt("Save as: ", |_, _, _| {}).unwrap_or(None);
             if new_name.is_none() {
                 self.status_message = StatusMessage::from("Save aborted.".to_owned());
                 return;
@@ -406,6 +415,80 @@ impl Editor {
             "Error writing file!"
         };
         self.status_message = StatusMessage::from(msg.to_owned());
+    }
+
+    /// Searches for a query in the document with incremental backward and forward search.
+    fn search(&mut self) {
+        let old_position = self.cursor_position.clone();
+        // We start by searching forward.
+        let mut forward = true;
+        // NOTE: Every time the query is updated, either by typing or deleting,
+        // the cursor is moved back to the old position to start a new forward search.
+        let incremental_search = |editor: &mut Self, key: Key, partial_query: &String| {
+            let mut moved = false;
+            match key {
+                Key::Char(_) | Key::Backspace => {
+                    editor.cursor_position = old_position.clone();
+                    editor.scroll();
+                    forward = true;
+                }
+                Key::Right | Key::Down => {
+                    // NOTE: For our incremental search to not return the current position.
+                    // Will move back if no next match is found.
+                    editor.move_cursor(Key::Right);
+                    forward = true;
+                    moved = true;
+                }
+                Key::Left | Key::Up => {
+                    // The current position is excluded from the search, so will not return the current position.
+                    forward = false;
+                }
+                _ => (),
+            }
+            let find_func = if forward {
+                Document::find_after
+            } else {
+                Document::rfind_before
+            };
+
+            if let Some(position) =
+                find_func(&editor.document, partial_query, &editor.cursor_position)
+            {
+                editor.cursor_position = position;
+                editor.scroll();
+            } else if moved {
+                // Not found, move the offset back.
+                editor.move_cursor(Key::Left);
+            }
+        };
+
+        // Perform the search.
+        if let Some(query) = self
+            .prompt(
+                "Search (ESC to cancel, Arrows to navigate): ",
+                incremental_search,
+            )
+            .unwrap_or(None)
+        {
+            // The find is done along with the incremental search.
+            // If the find succeeds, the cursor is already at the right position.
+            // Otherwise, the cursor is moved back to the old position.
+            // However, there's a chance that we're at the old position if it's the first match.
+            // So we perform an additional forward search.
+            if self.cursor_position == old_position
+                && self
+                    .document
+                    .find_after(&query, &self.cursor_position)
+                    .is_none()
+            {
+                self.status_message = StatusMessage::from(format!("Not found: {query}"));
+            }
+        } else {
+            self.status_message = StatusMessage::from("Search canceled.".to_owned());
+            // The user canceled the search; restore the old position.
+            self.cursor_position = old_position;
+            self.scroll();
+        }
     }
 }
 

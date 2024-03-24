@@ -128,4 +128,40 @@ impl Document {
     pub fn is_dirty(&self) -> bool {
         self.is_dirty
     }
+
+    /// Find the first occurrence of a query after a given position.
+    #[must_use]
+    pub fn find_after(&self, query: &str, after: &Position) -> Option<Position> {
+        // NOTE: The start row is skipped if `after` exceeds the row length.
+        let mut x = after.x;
+        for (y, row) in self.rows.iter().enumerate().skip(after.y) {
+            if let Some(x) = row.find_after(query, x) {
+                return Some(Position { x, y });
+            }
+            // Only the start row is affected by the `after` position.
+            x = 0;
+        }
+        None
+    }
+
+    /// Find the last occurrence of a query before a given position.
+    #[must_use]
+    pub fn rfind_before(&self, query: &str, before: &Position) -> Option<Position> {
+        let mut x = before.x;
+        #[allow(clippy::indexing_slicing)]
+        for (y, row) in self
+            .rows
+            .iter()
+            .enumerate()
+            .take(before.y.saturating_add(1) /* first n, one-based */)
+            .rev()
+        {
+            if let Some(x) = row.rfind_before(query, x) {
+                return Some(Position { x, y });
+            }
+            // Only the start row is affected by the `before` position.
+            x = self.rows[y.saturating_sub(1)].len();
+        }
+        None
+    }
 }
