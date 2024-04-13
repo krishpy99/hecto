@@ -9,6 +9,8 @@ pub struct FileType {
 pub struct HighlightingOptions {
     /// Whether to highlight numbers.
     numbers: bool,
+    /// Whether to highlight strings.
+    strings: bool,
 }
 
 impl Default for FileType {
@@ -40,7 +42,10 @@ impl FileType {
         {
             return Self {
                 name: String::from("Rust"),
-                hl_opts: HighlightingOptions { numbers: true },
+                hl_opts: HighlightingOptions {
+                    numbers: true,
+                    strings: true,
+                },
             };
         }
         Self::default()
@@ -51,5 +56,10 @@ impl HighlightingOptions {
     #[must_use]
     pub fn numbers(self) -> bool {
         self.numbers
+    }
+
+    #[must_use]
+    pub fn strings(self) -> bool {
+        self.strings
     }
 }

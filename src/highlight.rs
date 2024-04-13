@@ -4,7 +4,9 @@ use termion::color;
 pub enum Type {
     None,
     Number,
+    // Search results.
     Search,
+    String,
 }
 
 impl Type {
@@ -12,6 +14,7 @@ impl Type {
         match self {
             Type::Number => &color::Red,
             Type::Search => &color::Blue,
+            Type::String => &color::Magenta,
             Type::None => &color::Reset,
         }
     }

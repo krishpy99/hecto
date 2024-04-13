@@ -174,20 +174,30 @@ impl Row {
         // To avoid highlighting part of an identifier as number, we record whether the number is
         // preceded by a separator.
         let mut prev_is_separator = true;
+        let mut is_in_string = false;
+        let mut is_escaped = false;
         let mut prev_highlight = highlight::Type::None;
         self.highlight = self
             .string
             .chars()
             .map(|c| {
                 prev_highlight = if opts.numbers()
+                    && !is_in_string
                     && (c.is_ascii_digit() || c == '.')
                     && (prev_is_separator || prev_highlight == highlight::Type::Number)
                 {
                     highlight::Type::Number
+                } else if opts.strings() && (is_in_string || (prev_is_separator && c == '"')) {
+                    if c == '"' && !is_escaped {
+                        is_in_string = !is_in_string;
+                    }
+                    is_escaped = c == '\\' && !is_escaped;
+                    highlight::Type::String
                 } else {
                     highlight::Type::None
                 };
-                prev_is_separator = c.is_ascii_punctuation() || c.is_ascii_whitespace();
+                prev_is_separator =
+                    !is_in_string && (c.is_ascii_punctuation() || c.is_ascii_whitespace());
                 prev_highlight
             })
             .collect();
