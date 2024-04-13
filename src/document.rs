@@ -1,3 +1,4 @@
+use crate::FileType;
 use crate::Position;
 use crate::Row;
 use std::fs;
@@ -9,6 +10,7 @@ pub struct Document {
     pub filename: Option<String>,
     /// Whether the document has been modified since the last save.
     is_dirty: bool,
+    file_type: FileType,
 }
 
 impl Document {
@@ -16,15 +18,24 @@ impl Document {
     /// Returns an error if the file can't be read.
     pub fn open(filename: &str) -> Result<Self, Error> {
         let content = fs::read_to_string(filename)?;
+        let file_type = FileType::from(filename);
         let mut rows = Vec::new();
         for value in content.lines() {
-            rows.push(Row::from(value));
+            let mut row = Row::from(value);
+            row.highlight(file_type.highlight_options());
+            rows.push(row);
         }
         Ok(Self {
             rows,
             filename: Some(filename.to_owned()),
             is_dirty: false,
+            file_type,
         })
+    }
+
+    #[must_use]
+    pub fn file_type(&self) -> String {
+        self.file_type.name()
     }
 
     #[must_use]
@@ -60,11 +71,13 @@ impl Document {
         if at.y == self.len() {
             let mut row = Row::default();
             row.insert(0, c);
+            row.highlight(self.file_type.highlight_options());
             self.rows.push(row);
         } else {
             #[allow(clippy::indexing_slicing)]
             let row = &mut self.rows[at.y];
             row.insert(at.x, c);
+            row.highlight(self.file_type.highlight_options());
         }
     }
 
@@ -81,7 +94,10 @@ impl Document {
         }
         // This works even at the end of a line, with `new_row` being empty.
         #[allow(clippy::indexing_slicing)]
-        let new_row = self.rows[at.y].split(at.x);
+        let curr_row = &mut self.rows[at.y];
+        let mut new_row = curr_row.split(at.x);
+        curr_row.highlight(self.file_type.highlight_options());
+        new_row.highlight(self.file_type.highlight_options());
         #[allow(clippy::arithmetic_side_effects)]
         self.rows.insert(at.y + 1, new_row);
     }
@@ -103,9 +119,11 @@ impl Document {
             let next_row = self.rows.remove(at.y + 1);
             let this_row = &mut self.rows[at.y];
             this_row.append(&next_row);
+            this_row.highlight(self.file_type.highlight_options());
         } else {
             let this_row = &mut self.rows[at.y];
             this_row.delete(at.x);
+            this_row.highlight(self.file_type.highlight_options());
         }
     }
 
@@ -115,9 +133,11 @@ impl Document {
     pub fn save(&mut self) -> Result<(), Error> {
         if let Some(filename) = &self.filename {
             let mut file = fs::File::create(filename)?;
-            for row in &self.rows {
+            self.file_type = FileType::from(filename);
+            for row in &mut self.rows {
                 file.write_all(row.as_bytes())?;
                 file.write_all(b"\n")?;
+                row.highlight(self.file_type.highlight_options());
             }
             self.is_dirty = false;
         }
@@ -163,5 +183,17 @@ impl Document {
             x = self.rows[y.saturating_sub(1)].len();
         }
         None
+    }
+
+    pub fn highlight_query(&mut self, query: &str) {
+        self.rows
+            .iter_mut()
+            .for_each(|row| row.highlight_query(query));
+    }
+
+    pub fn highlight_restore(&mut self) {
+        self.rows
+            .iter_mut()
+            .for_each(|row| row.highlight(self.file_type.highlight_options()));
     }
 }

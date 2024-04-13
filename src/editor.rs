@@ -327,7 +327,8 @@ impl Editor {
             self.document.len()
         );
         let line_indicator = format!(
-            "{}/{}",
+            "{} | {}/{}",
+            self.document.file_type(),
             self.cursor_position.y.saturating_add(1), /* 1-based */
             self.document.len()
         );
@@ -451,6 +452,8 @@ impl Editor {
                 Document::rfind_before
             };
 
+            editor.document.highlight_restore();
+
             if let Some(position) =
                 find_func(&editor.document, partial_query, &editor.cursor_position)
             {
@@ -460,6 +463,7 @@ impl Editor {
                 // Not found, move the offset back.
                 editor.move_cursor(Key::Left);
             }
+            editor.document.highlight_query(partial_query);
         };
 
         // Perform the search.
@@ -489,6 +493,7 @@ impl Editor {
             self.cursor_position = old_position;
             self.scroll();
         }
+        self.document.highlight_restore();
     }
 }
 

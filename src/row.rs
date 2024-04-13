@@ -1,10 +1,14 @@
+use crate::highlight;
+use crate::HighlightingOptions;
 use core::cmp;
 
+use termion::color;
 use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(Default)]
 pub struct Row {
     string: String,
+    highlight: Vec<highlight::Type>,
     len: usize,
 }
 
@@ -12,6 +16,7 @@ impl From<&str> for Row {
     fn from(s: &str) -> Self {
         let mut row = Self {
             string: String::from(s),
+            highlight: Vec::new(),
             len: 0,
         };
         row.update_len();
@@ -27,19 +32,33 @@ impl Row {
         // In case that `start` is greater than `end`, we want to return an empty string.
         let start = cmp::min(start, end);
         let mut result = String::new();
+        let mut curr_highlight = &highlight::Type::None;
         #[allow(clippy::arithmetic_side_effects)]
-        for grapheme in self
+        for (index, grapheme) in self
             .string
             .as_str()
             .graphemes(true)
+            .enumerate()
             .skip(start /* the ones to the left of the screen */)
             .take(end - start /* the visible portion of the row */)
         {
             // A tab is converted to a single space.
-            // NOTE: If converting to multiple spaces, special care would be needed to
-            // maintain the cursor position, as well as leaving it as it is.
-            result.push_str(if grapheme == "\t" { " " } else { grapheme });
+            if let Some(c) = grapheme.chars().next() {
+                // NOTE: In case some internal error occurs, we want to keep from crashing.
+                let highlight_type = self.highlight.get(index).unwrap_or(&highlight::Type::None);
+                // Insert a new color sequence only if the color has changed.
+                if highlight_type != curr_highlight {
+                    curr_highlight = highlight_type;
+                    let start_highlight = format!("{}", color::Fg(highlight_type.as_color()));
+                    result.push_str(&start_highlight);
+                }
+                // NOTE: If converting to multiple spaces, special care would be needed to
+                // maintain the cursor position, as well as leaving it as it is.
+                result.push(if c == '\t' { ' ' } else { c });
+            }
         }
+        let end_highlight = format!("{}", color::Fg(color::Reset));
+        result.push_str(&end_highlight);
         result
     }
 
@@ -107,9 +126,10 @@ impl Row {
     }
 
     /// Finds the index of the first occurrence of a query string after a given index.
+    /// An empty query string will return `None`.
     #[must_use]
     pub fn find_after(&self, query: &str, after: usize) -> Option<usize> {
-        if after >= self.len() {
+        if after >= self.len() || query.is_empty() {
             return None;
         }
         let substring: String = self.string.as_str().graphemes(true).skip(after).collect();
@@ -128,10 +148,10 @@ impl Row {
     }
 
     /// Finds the index of the last occurrence of a query string before a given index. `before` is
-    /// excluded from the search.
+    /// excluded from the search. An empty query string will return `None`.
     #[must_use]
     pub fn rfind_before(&self, query: &str, before: usize) -> Option<usize> {
-        if before == 0 {
+        if before == 0 || query.is_empty() {
             return None;
         }
         // NOTE: Since a before exceeding the length of the row doesn't affect the result,
@@ -148,5 +168,52 @@ impl Row {
             }
         }
         None
+    }
+
+    pub fn highlight(&mut self, opts: HighlightingOptions) {
+        // To avoid highlighting part of an identifier as number, we record whether the number is
+        // preceded by a separator.
+        let mut prev_is_separator = true;
+        let mut prev_highlight = highlight::Type::None;
+        self.highlight = self
+            .string
+            .chars()
+            .map(|c| {
+                prev_highlight = if opts.numbers()
+                    && (c.is_ascii_digit() || c == '.')
+                    && (prev_is_separator || prev_highlight == highlight::Type::Number)
+                {
+                    highlight::Type::Number
+                } else {
+                    highlight::Type::None
+                };
+                prev_is_separator = c.is_ascii_punctuation() || c.is_ascii_whitespace();
+                prev_highlight
+            })
+            .collect();
+    }
+
+    /// Highlights all occurrences of a query string in the row with other words untouched.
+    pub fn highlight_query(&mut self, query: &str) {
+        // Find the index of all occurrences of the query string.
+        let mut matches = Vec::new();
+        let mut start = 0;
+        while let Some(index) = self.find_after(query, start) {
+            matches.push(index);
+            if let Some(next_index) = index.checked_add(query.graphemes(true).count()) {
+                start = next_index;
+            } else {
+                break;
+            }
+        }
+
+        // Highlight the matches.
+        while let Some(index) = matches.pop() {
+            for i in index..index.saturating_add(query.graphemes(true).count()) {
+                if let Some(highlight) = self.highlight.get_mut(i) {
+                    *highlight = highlight::Type::Search;
+                }
+            }
+        }
     }
 }
