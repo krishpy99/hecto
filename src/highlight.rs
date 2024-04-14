@@ -1,5 +1,6 @@
 use termion::color;
 
+#[allow(clippy::enum_variant_names)] // The word "Type" in DataType has different meaning.
 #[derive(PartialEq, Copy, Clone)]
 pub enum Type {
     None,
@@ -9,6 +10,8 @@ pub enum Type {
     String,
     Character,
     Comment,
+    Keyword,
+    DataType,
 }
 
 impl Type {
@@ -16,9 +19,11 @@ impl Type {
         match self {
             Type::Number => &color::Red,
             Type::Search => &color::Blue,
-            Type::String => &color::Magenta,
+            Type::String => &color::Green,
             Type::Character => &color::LightBlue,
             Type::Comment => &color::LightBlack,
+            Type::Keyword => &color::Magenta,
+            Type::DataType => &color::LightMagenta,
             Type::None => &color::Reset,
         }
     }

@@ -19,7 +19,8 @@
     clippy::exhaustive_structs,
     clippy::exhaustive_enums,
     clippy::pattern_type_mismatch,
-    clippy::panic
+    clippy::panic,
+    clippy::unseparated_literal_suffix
 )]
 mod document;
 mod editor;

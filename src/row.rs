@@ -193,11 +193,91 @@ impl Row {
         false
     }
 
+    /// Returns the length of the keyword that starts at `from`. 0 if there is no keyword.
+    /// A sub-row is said to form a keyword if it is a prefix of any of the keywords, followed by a separator.
+    /// `keyword_len` is updated to the length of the keyword.
+    #[must_use]
+    fn forms_keyword_from(
+        &self,
+        from: usize,
+        keywords: &Vec<String>,
+        // XXX: Out-parameter `keyword_len` is a workaround for assigning in a condition.
+        keyword_len: &mut usize,
+    ) -> usize {
+        // FIXME: Handle UTF-8 characters.
+        #[allow(clippy::string_slice)]
+        for keyword in keywords {
+            if self
+                .string
+                .get(from..)
+                .map_or(false, |s| s.starts_with(keyword))
+            {
+                if let Some(next_index) = from.checked_add(keyword.len()) {
+                    // The separater is either the end of the row (line) or an actual separator.
+                    if next_index == self.len() {
+                        *keyword_len = keyword.len();
+                        return keyword.len();
+                    }
+                    if let Some(c) = self.string.as_str().graphemes(true).nth(next_index) {
+                        if c.chars().next().map_or(false, Self::is_separator) {
+                            *keyword_len = keyword.len();
+                            return keyword.len();
+                        }
+                    }
+                }
+            }
+        }
+        *keyword_len = 0;
+        0
+    }
+
+    /// Returns the length of the data type that starts at `from`. 0 if there is no data type.
+    /// A sub-row is said to form a data type if it is a prefix of any of the data types, followed by a separator.
+    /// `data_type_len` is updated to the length of the data type.
+    #[must_use]
+    fn forms_data_type_from(
+        &self,
+        from: usize,
+        data_types: &Vec<String>,
+        // XXX: Out-parameter `data_type_len` is a workaround for assigning in a condition.
+        data_type_len: &mut usize,
+    ) -> usize {
+        // FIXME: Handle UTF-8 characters.
+        #[allow(clippy::string_slice)]
+        for data_type in data_types {
+            if self
+                .string
+                .get(from..)
+                .map_or(false, |s| s.starts_with(data_type))
+            {
+                if let Some(next_index) = from.checked_add(data_type.len()) {
+                    // The separater is either the end of the row or a punctuation or whitespace.
+                    if next_index == self.len() {
+                        *data_type_len = data_type.len();
+                        return data_type.len();
+                    }
+                    if let Some(c) = self.string.as_str().graphemes(true).nth(next_index) {
+                        if c.chars().next().map_or(false, Self::is_separator) {
+                            *data_type_len = data_type.len();
+                            return data_type.len();
+                        }
+                    }
+                }
+            }
+        }
+        *data_type_len = 0;
+        0
+    }
+
     #[allow(clippy::arithmetic_side_effects)] // Overflow checked by `checked_add`.
-    pub fn highlight(&mut self, opts: HighlightingOptions) {
+    pub fn highlight(&mut self, opts: &HighlightingOptions) {
         // To avoid highlighting part of an identifier as number, we record whether the number is
         // preceded by a separator.
         let mut prev_is_separator = true;
+        // Is in keyword if greater than 0.
+        let mut remaining_keyword_len = 0usize;
+        // Is in data type if greater than 0.
+        let mut remaining_data_type_len = 0usize;
         let mut is_in_comment = false;
         let mut is_in_character = false;
         let mut is_in_string = false;
@@ -241,12 +321,28 @@ impl Row {
                         is_in_string = !is_in_string;
                     }
                     highlight::Type::String
+                } else if remaining_keyword_len > 0
+                    || prev_is_separator
+                        && self.forms_keyword_from(i, opts.keywords(), &mut remaining_keyword_len)
+                            > 0
+                {
+                    remaining_keyword_len = remaining_keyword_len.saturating_sub(1);
+                    highlight::Type::Keyword
+                } else if remaining_data_type_len > 0
+                    || prev_is_separator
+                        && self.forms_data_type_from(
+                            i,
+                            opts.data_types(),
+                            &mut remaining_data_type_len,
+                        ) > 0
+                {
+                    remaining_data_type_len = remaining_data_type_len.saturating_sub(1);
+                    highlight::Type::DataType
                 } else {
                     highlight::Type::None
                 };
                 is_escaped = c == '\\' && !is_escaped;
-                prev_is_separator =
-                    !is_in_string && (c.is_ascii_punctuation() || c.is_ascii_whitespace());
+                prev_is_separator = !is_in_string && Self::is_separator(c);
                 prev_highlight
             })
             .collect();
@@ -274,5 +370,10 @@ impl Row {
                 }
             }
         }
+    }
+
+    fn is_separator(c: char) -> bool {
+        // '_' can be part of an identifier.
+        (c.is_ascii_punctuation() && c != '_') || c.is_ascii_whitespace()
     }
 }
