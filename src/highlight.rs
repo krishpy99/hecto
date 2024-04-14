@@ -10,6 +10,7 @@ pub struct HighlightingOptions {
     pub multiline_comments: bool,
     pub keywords: Vec<String>,
     pub data_types: Vec<String>,
+    pub punctuations: Vec<char>,
 }
 
 #[allow(clippy::enum_variant_names)] // The word "Type" in DataType has different meaning.
@@ -25,6 +26,7 @@ pub enum Type {
     MultilineComment,
     Keyword,
     DataType,
+    Punctuation,
 }
 
 impl Type {
@@ -37,6 +39,7 @@ impl Type {
             Type::Comment | Type::MultilineComment => &color::LightBlack,
             Type::Keyword => &color::Magenta,
             Type::DataType => &color::LightMagenta,
+            Type::Punctuation => &color::Cyan,
             Type::None => &color::Reset,
         }
     }

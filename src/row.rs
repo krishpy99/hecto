@@ -366,6 +366,8 @@ impl Row {
                 {
                     remaining_data_type_len = remaining_data_type_len.saturating_sub(1);
                     highlight::Type::DataType
+                } else if opts.punctuations.iter().any(|&p| p == c) {
+                    highlight::Type::Punctuation
                 } else {
                     highlight::Type::None
                 };

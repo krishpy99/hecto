@@ -121,6 +121,10 @@ impl FileType {
                         "true".to_owned(),
                         "false".to_owned(),
                     ],
+                    punctuations: vec![
+                        ':', ';', ',', '.', '#', '!', '&', '|', '+', '-', '*', '/', '=', '?', '<',
+                        '>',
+                    ],
                 },
             };
         }
