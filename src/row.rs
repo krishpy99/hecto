@@ -288,7 +288,7 @@ impl Row {
             .chars()
             .enumerate()
             .map(|(i, c)| {
-                prev_highlight = if opts.comments() && is_in_comment
+                prev_highlight = if opts.comments && is_in_comment
                     || (c == '/'
                         && i.checked_add(1).is_some()
                         && self.string.chars().nth(i + 1) == Some('/'))
@@ -296,7 +296,7 @@ impl Row {
                     // The rest of the line is a comment; not going to end.
                     is_in_comment = true;
                     highlight::Type::Comment
-                } else if opts.numbers()
+                } else if opts.numbers
                     && !is_in_string
                     && (c.is_ascii_digit()
                         || (c == '.'
@@ -309,21 +309,21 @@ impl Row {
                     && (prev_is_separator || prev_highlight == highlight::Type::Number)
                 {
                     highlight::Type::Number
-                } else if opts.characters()
+                } else if opts.characters
                     && (is_in_character || (!is_in_string && self.forms_character_from(i)))
                 {
                     if c == '\'' && !is_escaped {
                         is_in_character = !is_in_character;
                     }
                     highlight::Type::Character
-                } else if opts.strings() && (is_in_string || (prev_is_separator && c == '"')) {
+                } else if opts.strings && (is_in_string || (prev_is_separator && c == '"')) {
                     if c == '"' && !is_escaped {
                         is_in_string = !is_in_string;
                     }
                     highlight::Type::String
                 } else if remaining_keyword_len > 0
                     || prev_is_separator
-                        && self.forms_keyword_from(i, opts.keywords(), &mut remaining_keyword_len)
+                        && self.forms_keyword_from(i, &opts.keywords, &mut remaining_keyword_len)
                             > 0
                 {
                     remaining_keyword_len = remaining_keyword_len.saturating_sub(1);
@@ -332,7 +332,7 @@ impl Row {
                     || prev_is_separator
                         && self.forms_data_type_from(
                             i,
-                            opts.data_types(),
+                            &opts.data_types,
                             &mut remaining_data_type_len,
                         ) > 0
                 {

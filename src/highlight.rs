@@ -1,5 +1,16 @@
 use termion::color;
 
+#[allow(clippy::struct_excessive_bools)]
+#[derive(Default)]
+pub struct HighlightingOptions {
+    pub numbers: bool,
+    pub strings: bool,
+    pub characters: bool,
+    pub comments: bool,
+    pub keywords: Vec<String>,
+    pub data_types: Vec<String>,
+}
+
 #[allow(clippy::enum_variant_names)] // The word "Type" in DataType has different meaning.
 #[derive(PartialEq, Copy, Clone)]
 pub enum Type {

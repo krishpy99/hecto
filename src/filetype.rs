@@ -1,19 +1,9 @@
+use crate::HighlightingOptions;
 use std::path::Path;
 
 pub struct FileType {
     name: String,
     hl_opts: HighlightingOptions,
-}
-
-#[allow(clippy::struct_excessive_bools)]
-#[derive(Default)]
-pub struct HighlightingOptions {
-    numbers: bool,
-    strings: bool,
-    characters: bool,
-    comments: bool,
-    keywords: Vec<String>,
-    data_types: Vec<String>,
 }
 
 impl Default for FileType {
@@ -134,37 +124,5 @@ impl FileType {
             };
         }
         Self::default()
-    }
-}
-
-impl HighlightingOptions {
-    #[must_use]
-    pub fn numbers(&self) -> bool {
-        self.numbers
-    }
-
-    #[must_use]
-    pub fn strings(&self) -> bool {
-        self.strings
-    }
-
-    #[must_use]
-    pub fn characters(&self) -> bool {
-        self.characters
-    }
-
-    #[must_use]
-    pub fn comments(&self) -> bool {
-        self.comments
-    }
-
-    #[must_use]
-    pub fn keywords(&self) -> &Vec<String> {
-        &self.keywords
-    }
-
-    #[must_use]
-    pub fn data_types(&self) -> &Vec<String> {
-        &self.data_types
     }
 }

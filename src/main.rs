@@ -31,7 +31,7 @@ mod terminal;
 pub use document::Document;
 pub use editor::Position;
 pub use filetype::FileType;
-pub use filetype::HighlightingOptions;
+pub use highlight::HighlightingOptions;
 pub use row::Row;
 pub use terminal::Terminal;
 
