@@ -183,7 +183,13 @@ impl Row {
             .map(|c| {
                 prev_highlight = if opts.numbers()
                     && !is_in_string
-                    && (c.is_ascii_digit() || c == '.')
+                    && (c.is_ascii_digit()
+                        || (c == '.'
+                            && self
+                                .string
+                                .chars()
+                                .nth(i + 1)
+                                .map_or(false, |c| c.is_ascii_digit())))
                     && (prev_is_separator || prev_highlight == highlight::Type::Number)
                 {
                     highlight::Type::Number
