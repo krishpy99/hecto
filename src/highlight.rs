@@ -30,9 +30,9 @@ pub enum Type {
 impl Type {
     pub fn as_color(&self) -> &dyn color::Color {
         match self {
-            Type::Number => &color::Red,
+            Type::Number => &color::Rgb(255, 128, 0), // Orange
             Type::Search => &color::Blue,
-            Type::String => &color::Green,
+            Type::String => &color::Yellow,
             Type::Character => &color::LightBlue,
             Type::Comment | Type::MultilineComment => &color::LightBlack,
             Type::Keyword => &color::Magenta,
