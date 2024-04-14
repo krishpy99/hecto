@@ -12,6 +12,14 @@ pub struct Row {
     len: usize,
 }
 
+/// The information after the row that is highlighted; may affect the highlighting of the next row.
+/// For example, if the row ends with a multiline comment, the next row will be highlighted as a multiline comment.
+/// Pass the context to the next row to continue highlighting if the operation affects the next row; otherwise, the default value suffices.
+#[derive(Default)]
+pub struct HighlightContext {
+    pub is_in_multiline_comment: bool,
+}
+
 impl From<&str> for Row {
     fn from(s: &str) -> Self {
         let mut row = Self {
@@ -270,7 +278,11 @@ impl Row {
     }
 
     #[allow(clippy::arithmetic_side_effects)] // Overflow checked by `checked_add`.
-    pub fn highlight(&mut self, opts: &HighlightingOptions) {
+    pub fn highlight(
+        &mut self,
+        opts: &HighlightingOptions,
+        ctx: &HighlightContext,
+    ) -> HighlightContext {
         // To avoid highlighting part of an identifier as number, we record whether the number is
         // preceded by a separator.
         let mut prev_is_separator = true;
@@ -279,6 +291,7 @@ impl Row {
         // Is in data type if greater than 0.
         let mut remaining_data_type_len = 0usize;
         let mut is_in_comment = false;
+        let mut is_in_multiline_comment = ctx.is_in_multiline_comment;
         let mut is_in_character = false;
         let mut is_in_string = false;
         let mut is_escaped = false;
@@ -296,6 +309,21 @@ impl Row {
                     // The rest of the line is a comment; not going to end.
                     is_in_comment = true;
                     highlight::Type::Comment
+                } else if opts.multiline_comments && is_in_multiline_comment
+                    || (c == '/'
+                        && i.checked_add(1).is_some()
+                        && self.string.chars().nth(i + 1) == Some('*'))
+                {
+                    if is_in_multiline_comment
+                        && c == '/'
+                        && i.checked_sub(1).is_some()
+                        && self.string.chars().nth(i - 1) == Some('*')
+                    {
+                        is_in_multiline_comment = false;
+                    } else if !is_in_multiline_comment {
+                        is_in_multiline_comment = true;
+                    }
+                    highlight::Type::MultilineComment
                 } else if opts.numbers
                     && !is_in_string
                     && (c.is_ascii_digit()
@@ -346,6 +374,9 @@ impl Row {
                 prev_highlight
             })
             .collect();
+        HighlightContext {
+            is_in_multiline_comment,
+        }
     }
 
     /// Highlights all occurrences of a query string in the row with other words untouched.

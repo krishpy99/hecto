@@ -7,6 +7,7 @@ pub struct HighlightingOptions {
     pub strings: bool,
     pub characters: bool,
     pub comments: bool,
+    pub multiline_comments: bool,
     pub keywords: Vec<String>,
     pub data_types: Vec<String>,
 }
@@ -21,6 +22,7 @@ pub enum Type {
     String,
     Character,
     Comment,
+    MultilineComment,
     Keyword,
     DataType,
 }
@@ -32,7 +34,7 @@ impl Type {
             Type::Search => &color::Blue,
             Type::String => &color::Green,
             Type::Character => &color::LightBlue,
-            Type::Comment => &color::LightBlack,
+            Type::Comment | Type::MultilineComment => &color::LightBlack,
             Type::Keyword => &color::Magenta,
             Type::DataType => &color::LightMagenta,
             Type::None => &color::Reset,

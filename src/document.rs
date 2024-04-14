@@ -1,3 +1,4 @@
+use crate::row;
 use crate::FileType;
 use crate::Position;
 use crate::Row;
@@ -21,8 +22,7 @@ impl Document {
         let file_type = FileType::from(filename);
         let mut rows = Vec::new();
         for value in content.lines() {
-            let mut row = Row::from(value);
-            row.highlight(file_type.highlight_options());
+            let row = Row::from(value);
             rows.push(row);
         }
         Ok(Self {
@@ -71,13 +71,11 @@ impl Document {
         if at.y == self.len() {
             let mut row = Row::default();
             row.insert(0, c);
-            row.highlight(self.file_type.highlight_options());
             self.rows.push(row);
         } else {
             #[allow(clippy::indexing_slicing)]
             let row = &mut self.rows[at.y];
             row.insert(at.x, c);
-            row.highlight(self.file_type.highlight_options());
         }
     }
 
@@ -95,9 +93,7 @@ impl Document {
         // This works even at the end of a line, with `new_row` being empty.
         #[allow(clippy::indexing_slicing)]
         let curr_row = &mut self.rows[at.y];
-        let mut new_row = curr_row.split(at.x);
-        curr_row.highlight(self.file_type.highlight_options());
-        new_row.highlight(self.file_type.highlight_options());
+        let new_row = curr_row.split(at.x);
         #[allow(clippy::arithmetic_side_effects)]
         self.rows.insert(at.y + 1, new_row);
     }
@@ -119,11 +115,9 @@ impl Document {
             let next_row = self.rows.remove(at.y + 1);
             let this_row = &mut self.rows[at.y];
             this_row.append(&next_row);
-            this_row.highlight(self.file_type.highlight_options());
         } else {
             let this_row = &mut self.rows[at.y];
             this_row.delete(at.x);
-            this_row.highlight(self.file_type.highlight_options());
         }
     }
 
@@ -137,7 +131,6 @@ impl Document {
             for row in &mut self.rows {
                 file.write_all(row.as_bytes())?;
                 file.write_all(b"\n")?;
-                row.highlight(self.file_type.highlight_options());
             }
             self.is_dirty = false;
         }
@@ -185,15 +178,26 @@ impl Document {
         None
     }
 
+    /// Highlight the document until a given row. Note that the highlight of a row is only affected by the previous rows.
+    pub fn highlight_until(&mut self, until: usize) {
+        let mut highlight_ctx = row::HighlightContext::default();
+        self.rows.iter_mut().take(until).for_each(|row| {
+            highlight_ctx = row.highlight(self.file_type.highlight_options(), &highlight_ctx);
+        });
+    }
+
+    /// Highlight the query in the entire document.
     pub fn highlight_query(&mut self, query: &str) {
         self.rows
             .iter_mut()
             .for_each(|row| row.highlight_query(query));
     }
 
+    /// Restore the original highlight of the document, particularly after highlighting a query.
     pub fn highlight_restore(&mut self) {
-        self.rows
-            .iter_mut()
-            .for_each(|row| row.highlight(self.file_type.highlight_options()));
+        let mut highlight_ctx = row::HighlightContext::default();
+        self.rows.iter_mut().for_each(|row| {
+            highlight_ctx = row.highlight(self.file_type.highlight_options(), &highlight_ctx);
+        });
     }
 }

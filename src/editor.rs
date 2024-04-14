@@ -96,13 +96,18 @@ impl Editor {
         }
     }
 
-    fn refresh_screen(&self) -> Result<(), Error> {
+    fn refresh_screen(&mut self) -> Result<(), Error> {
         Terminal::cursor_hide(); // prevent the cursor from blinking
         Terminal::cursor_position(&Position::default());
         if self.should_quit {
             Terminal::clear_screen();
             println!("Goodbye.\r");
         } else {
+            self.document.highlight_until(
+                self.offset
+                    .y
+                    .saturating_add(self.terminal.size().height as usize),
+            );
             self.draw_rows();
             self.draw_status_bar();
             self.draw_message_bar();

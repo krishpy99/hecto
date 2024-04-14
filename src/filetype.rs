@@ -40,6 +40,7 @@ impl FileType {
                     strings: true,
                     characters: true,
                     comments: true,
+                    multiline_comments: true,
                     // The currently in used keywords in Rust:
                     // https://doc.rust-lang.org/book/appendix-01-keywords.html#keywords-currently-in-use
                     keywords: vec![
