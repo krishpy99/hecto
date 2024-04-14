@@ -170,21 +170,48 @@ impl Row {
         None
     }
 
+    /// Assuming that the character before `from` is not a backslash.
+    #[must_use]
+    #[allow(clippy::arithmetic_side_effects)] // Overflow checked by `checked_add`.
+    fn forms_character_from(&self, from: usize) -> bool {
+        if let Some(c) = self.string.as_str().graphemes(true).nth(from) {
+            if c == "'" && from.checked_add(1).is_some() {
+                // There are two forms:
+                // - '.' (single character)
+                // - '\.' (escaped character)
+                // where '.' is any character except for a backslash.
+                if let Some(c) = self.string.as_str().graphemes(true).nth(from + 1) {
+                    return (c != "\\"
+                        && from.checked_add(2).is_some()
+                        && self.string.as_str().graphemes(true).nth(from + 2) == Some("'"))
+                        || (c == "\\"
+                            && from.checked_add(3).is_some()
+                            && self.string.as_str().graphemes(true).nth(from + 3) == Some("'"));
+                }
+            }
+        }
+        false
+    }
+
+    #[allow(clippy::arithmetic_side_effects)] // Overflow checked by `checked_add`.
     pub fn highlight(&mut self, opts: HighlightingOptions) {
         // To avoid highlighting part of an identifier as number, we record whether the number is
         // preceded by a separator.
         let mut prev_is_separator = true;
+        let mut is_in_character = false;
         let mut is_in_string = false;
         let mut is_escaped = false;
         let mut prev_highlight = highlight::Type::None;
         self.highlight = self
             .string
             .chars()
-            .map(|c| {
+            .enumerate()
+            .map(|(i, c)| {
                 prev_highlight = if opts.numbers()
                     && !is_in_string
                     && (c.is_ascii_digit()
                         || (c == '.'
+                            && i.checked_add(1).is_some()
                             && self
                                 .string
                                 .chars()
@@ -193,15 +220,22 @@ impl Row {
                     && (prev_is_separator || prev_highlight == highlight::Type::Number)
                 {
                     highlight::Type::Number
+                } else if opts.characters()
+                    && (is_in_character || (!is_in_string && self.forms_character_from(i)))
+                {
+                    if c == '\'' && !is_escaped {
+                        is_in_character = !is_in_character;
+                    }
+                    highlight::Type::Character
                 } else if opts.strings() && (is_in_string || (prev_is_separator && c == '"')) {
                     if c == '"' && !is_escaped {
                         is_in_string = !is_in_string;
                     }
-                    is_escaped = c == '\\' && !is_escaped;
                     highlight::Type::String
                 } else {
                     highlight::Type::None
                 };
+                is_escaped = c == '\\' && !is_escaped;
                 prev_is_separator =
                     !is_in_string && (c.is_ascii_punctuation() || c.is_ascii_whitespace());
                 prev_highlight

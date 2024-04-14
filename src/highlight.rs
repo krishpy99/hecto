@@ -7,6 +7,7 @@ pub enum Type {
     // Search results.
     Search,
     String,
+    Character,
 }
 
 impl Type {
@@ -15,6 +16,7 @@ impl Type {
             Type::Number => &color::Red,
             Type::Search => &color::Blue,
             Type::String => &color::Magenta,
+            Type::Character => &color::LightBlue,
             Type::None => &color::Reset,
         }
     }
