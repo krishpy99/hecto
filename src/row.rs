@@ -198,6 +198,7 @@ impl Row {
         // To avoid highlighting part of an identifier as number, we record whether the number is
         // preceded by a separator.
         let mut prev_is_separator = true;
+        let mut is_in_comment = false;
         let mut is_in_character = false;
         let mut is_in_string = false;
         let mut is_escaped = false;
@@ -207,7 +208,15 @@ impl Row {
             .chars()
             .enumerate()
             .map(|(i, c)| {
-                prev_highlight = if opts.numbers()
+                prev_highlight = if opts.comments() && is_in_comment
+                    || (c == '/'
+                        && i.checked_add(1).is_some()
+                        && self.string.chars().nth(i + 1) == Some('/'))
+                {
+                    // The rest of the line is a comment; not going to end.
+                    is_in_comment = true;
+                    highlight::Type::Comment
+                } else if opts.numbers()
                     && !is_in_string
                     && (c.is_ascii_digit()
                         || (c == '.'

@@ -8,6 +8,7 @@ pub enum Type {
     Search,
     String,
     Character,
+    Comment,
 }
 
 impl Type {
@@ -17,6 +18,7 @@ impl Type {
             Type::Search => &color::Blue,
             Type::String => &color::Magenta,
             Type::Character => &color::LightBlue,
+            Type::Comment => &color::LightBlack,
             Type::None => &color::Reset,
         }
     }

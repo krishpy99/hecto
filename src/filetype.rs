@@ -7,12 +7,10 @@ pub struct FileType {
 
 #[derive(Default, Copy, Clone)]
 pub struct HighlightingOptions {
-    /// Whether to highlight numbers.
     numbers: bool,
-    /// Whether to highlight strings.
     strings: bool,
-    /// Whether to highlight characters.
     characters: bool,
+    comments: bool,
 }
 
 impl Default for FileType {
@@ -48,6 +46,7 @@ impl FileType {
                     numbers: true,
                     strings: true,
                     characters: true,
+                    comments: true,
                 },
             };
         }
@@ -69,5 +68,10 @@ impl HighlightingOptions {
     #[must_use]
     pub fn characters(self) -> bool {
         self.characters
+    }
+
+    #[must_use]
+    pub fn comments(self) -> bool {
+        self.comments
     }
 }
