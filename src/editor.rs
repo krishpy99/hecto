@@ -7,6 +7,8 @@ use crate::Terminal;
 use std::io::Error;
 use termion::color;
 use termion::event::Key;
+use clipboard::ClipboardContext;
+use clipboard::ClipboardProvider;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const STATUS_BG_COLOR: color::Rgb = color::Rgb(239, 239, 239);
@@ -182,6 +184,16 @@ impl Editor {
                     return Ok(());
                 }
                 self.should_quit = true;
+            }
+            Key::Ctrl('v') => {
+                if let Ok(mut ctx) = ClipboardContext::new() {
+                    if let Ok(contents) = ctx.get_contents() {
+                        for c in contents.chars() {
+                            self.document.insert(&self.cursor_position, c);
+                            self.move_cursor(Key::Right);
+                        }
+                    }
+                }
             }
             Key::Ctrl('s') => self.save(),
             Key::Ctrl('f') => self.search(),
