@@ -4,6 +4,8 @@ use std::time::{Duration, Instant};
 use crate::Document;
 use crate::Row;
 use crate::Terminal;
+use clipboard::ClipboardContext;
+use clipboard::ClipboardProvider;
 use std::io::Error;
 use termion::color;
 use termion::event::Key;
@@ -182,6 +184,16 @@ impl Editor {
                     return Ok(());
                 }
                 self.should_quit = true;
+            }
+            Key::Ctrl('v') => {
+                if let Ok(mut ctx) = ClipboardContext::new() {
+                    if let Ok(contents) = ctx.get_contents() {
+                        for c in contents.chars() {
+                            self.document.insert(&self.cursor_position, c);
+                            self.move_cursor(Key::Right);
+                        }
+                    }
+                }
             }
             Key::Ctrl('s') => self.save(),
             Key::Ctrl('f') => self.search(),
