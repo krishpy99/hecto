@@ -4,11 +4,11 @@ use std::time::{Duration, Instant};
 use crate::Document;
 use crate::Row;
 use crate::Terminal;
+use clipboard::ClipboardContext;
+use clipboard::ClipboardProvider;
 use std::io::Error;
 use termion::color;
 use termion::event::Key;
-use clipboard::ClipboardContext;
-use clipboard::ClipboardProvider;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const STATUS_BG_COLOR: color::Rgb = color::Rgb(239, 239, 239);
