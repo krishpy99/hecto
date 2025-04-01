@@ -28,6 +28,19 @@ This project serves as an exercise for me to learn Rust, following the blog post
 
 - [Rust](https://www.rust-lang.org/tools/install)
 
+#### Linux
+
+On Linux that uses the X Window System, you need to install the following dependencies:
+
+- `libxcb-shape0-dev`
+- `libxcb-xfixes0-dev`
+
+For example, on Ubuntu:
+
+```sh
+sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev
+```
+
 ### Installation
 
 1. Clone the repository:
@@ -75,6 +88,7 @@ hecto <file>
 
 ### Commands
 
+- **Ctrl-V**: Paste from the system clipboard.
 - **Ctrl-F**: Find, navigate with arrow keys, press Enter to confirm and Esc to cancel.
 - **Ctrl-Q**: Quit, requires multiple presses to quit if there are unsaved changes.
 - **Ctrl-S**: Save, prompt for a filename if there is no filename associated with the file.
